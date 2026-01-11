@@ -11,15 +11,40 @@
     name:
       - gnupg
       - curl
+      - git
     state: present
     update_cache: true
 
-- name: Get remnux-cli
+- name: Get latest REMnux release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/REMnux/remnux-cli/releases/latest
+    return_content: true
+  register: remnux_api_response
+
+- name: Parse URL and Checksum from Metadata
+  ansible.builtin.set_fact:
+    # 1. Filter the list of assets to find the one named 'remnux-cli-linux'
+    remnux_asset: "{{ remnux_api_response.json.assets | selectattr('name', 'equalto', 'remnux-cli-linux') | first }}"
+
+- name: Set download variables
+  ansible.builtin.set_fact:
+    remnux_url: "{{ remnux_asset.browser_download_url }}"
+    # The API returns 'sha256:abcd...', which is exactly the format Ansible wants
+    remnux_checksum: "{{ remnux_asset.digest }}"
+
+- name: Download remnux-cli (Dynamic & Verified)
   ansible.builtin.get_url:
-    url: https://REMnux.org/remnux-cli
+    url: "{{ remnux_url }}"
     dest: /usr/local/bin/remnux-cli
-    checksum: sha256:c8c6d6830cfeb48c9ada2b49c76523c8637d95dc41d00aac345282fb47021f8e
-    mode: "774"
+    checksum: "{{ remnux_checksum }}"
+    mode: "0755"
+
+#- name: Get remnux-cli
+#  ansible.builtin.get_url:
+#    url: https://REMnux.org/remnux-cli
+#    dest: /usr/local/bin/remnux-cli
+#    checksum: sha256:c8c6d6830cfeb48c9ada2b49c76523c8637d95dc41d00aac345282fb47021f8e
+#    mode: "774"
 
 - name: Chmod remnux-cli
   ansible.builtin.file:
